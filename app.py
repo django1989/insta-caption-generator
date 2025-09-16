@@ -1,26 +1,57 @@
-import random
-import pandas as pd
 import streamlit as st
+import pandas as pd
+import random
+import requests
+import io
 
-# -----------------------------
-# لیست قلاب‌های احساسی و CTAها
-# -----------------------------
+# -----------------------------------
+# داده‌ها و پیکربندی ثابت
+# -----------------------------------
 emotional_hooks = [
-    lambda: "گاهی آرامش در حذف چیزهای اضافی پیدا می‌شود.",
-    lambda: "مثل رودخانه باش، مسیر را ساده بگیر.",
-    lambda: "زیبایی زندگی در سادگی آن پنهان است.",
-    lambda: "وقتی از ساده‌ترین راه بروی، مقصد زودتر می‌رسد."
+    lambda: "🌟 Keep shining, the world needs your light!",
+    lambda: "❤️ Every word here has a heartbeat.",
+    lambda: "💪 This is your daily boost!"
 ]
 
 ctas = [
-    lambda: "شما امروز چه چیزی را می‌توانید ساده‌تر کنید؟",
-    lambda: "امروز یک کار بیهوده را حذف کنید و تجربۀ خود را با ما به اشتراک بگذارید.",
-    lambda: "آخرین باری که بی‌دلیل چیزی را سخت کردید چه زمانی بود؟"
+    lambda: "💬 Share your thoughts below!",
+    lambda: "🗣 Which part touched you most?",
+    lambda: "📌 Save this post for later!"
 ]
 
-# -----------------------------
-# تابع تولید کپشن
-# -----------------------------
+general_hashtags = "#EnglishQuotes #DailyQuote #الهام #انگیزشی #PositiveVibes"
+
+# -----------------------------------
+# تابع گرفتن هشتگ آنلاین با پروکسی OpenRouter
+# -----------------------------------
+def generate_hashtags_online(quote):
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": "Bearer sk-or-openrouter-testing-key",  # کلید آزمایشی
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": "openai/gpt-4o-mini",
+        "messages": [
+            {"role": "system", "content": "You are an Instagram content assistant."},
+            {"role": "user", "content": f'Generate 10 relevant Instagram hashtags in English and Persian for: "{quote}". Just return the hashtags separated by spaces.'}
+        ],
+        "temperature": 0.7
+    }
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=20)
+        if response.status_code == 200:
+            result = response.json()
+            hashtags = result["choices"][0]["message"]["content"].strip()
+            return hashtags if hashtags else general_hashtags
+        else:
+            return general_hashtags
+    except Exception:
+        return general_hashtags
+
+# -----------------------------------
+# تابع ساخت کپشن
+# -----------------------------------
 def generate_caption(quote, author=""):
     words = quote.split()
     focus_word = random.choice(words) if words else ""
@@ -29,9 +60,11 @@ def generate_caption(quote, author=""):
     
     word_focus = {
         "word": focus_word,
-        "meaning": "معنی فارسی کوتاه برای این کلمه/عبارت",
+        "meaning": "معنی فارسی کوتاه",
         "example": f"Example: I use '{focus_word}' in a simple sentence."
     }
+    
+    hashtags = generate_hashtags_online(quote)
     
     caption = f"""{quote} — {author}
 
@@ -42,31 +75,46 @@ def generate_caption(quote, author=""):
 
 {random.choice(emotional_hooks)()}
 
-💬 {random.choice(ctas)()}"""
+💬 {random.choice(ctas)()}
+
+{hashtags}"""
     
     return caption
 
-# -----------------------------
+# -----------------------------------
 # رابط کاربری Streamlit
-# -----------------------------
-st.set_page_config(page_title="Caption Generator", page_icon="✍️", layout="centered")
+# -----------------------------------
+st.title("📸 Instagram Bilingual Caption Generator (Online Hashtags)")
 
-st.title("📜 جعبه‌ابزار هوشمند کپشن دو زبانه")
-st.write("جمله انگلیسی خود را وارد کنید:")
+uploaded_file = st.file_uploader("📂 آپلود فایل Excel جملات", type=["xlsx"])
 
-quote = st.text_input(" جمله انگلیسی")
-author = st.text_input(" نویسنده (اختیاری)")
+if uploaded_file is not None:
+    df = pd.read_excel(uploaded_file)
 
-if st.button("تولید کپشن"):
-    if quote.strip():
-        caption = generate_caption(quote, author)
-        st.text_area("کپشن تولید شده:", caption, height=300)
-        
-        # ذخیره در فایل Excel
-        df = pd.DataFrame({"Quote": [quote], "Author": [author], "Caption": [caption]})
-        df.to_excel("caption_output.xlsx", index=False)
-        
-        with open("caption_output.xlsx", "rb") as f:
-            st.download_button("دانلود خروجی Excel", f, file_name="caption_output.xlsx")
+    if "Quote" not in df.columns:
+        st.error("فایل باید ستونی به نام 'Quote' داشته باشد.")
     else:
-        st.warning("لطفاً یک جمله وارد کنید.")
+        captions = []
+        for _, row in df.iterrows():
+            quote = str(row["Quote"])
+            author = str(row.get("Author", ""))
+            captions.append(generate_caption(quote, author))
+        
+        df["Caption"] = captions
+
+        # دانلود Excel
+        excel_buffer = io.BytesIO()
+        df.to_excel(excel_buffer, index=False, engine='openpyxl')
+        excel_buffer.seek(0)
+
+        # دانلود CSV
+        csv_buffer = io.StringIO()
+        df.to_csv(csv_buffer, index=False)
+        csv_buffer.seek(0)
+
+        st.success("✅ کپشن‌ها ساخته شدند!")
+
+        st.download_button("⬇ دانلود Excel", data=excel_buffer, file_name="captions.xlsx")
+        st.download_button("⬇ دانلود CSV", data=csv_buffer, file_name="captions.csv")
+
+        st.write(df[["Quote", "Caption"]])

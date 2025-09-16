@@ -3,12 +3,26 @@ import pandas as pd
 import requests
 import io
 import json
+from deep_translator import GoogleTranslator
 
-# کپشنFallback آفلاین
+# ------------------------------
+# کپشنFallback آفلاین با ترجمه کامل
+# ------------------------------
 def offline_caption(quote, author=""):
+    try:
+        translated_sentence = GoogleTranslator(source='en', target='fa').translate(quote)
+    except Exception:
+        translated_sentence = "(ترجمه در دسترس نیست)"
+
+    # این رو میشه بعداً هوشمند کرد، فعلاً فقط نمونه
+    keyword = "simple"
+    keyword_meaning = "ساده"
+
     return f"""{quote} — {author}
 
-📖 معنی کلمه: simple = ساده
+🔹 معنی جمله: {translated_sentence}
+
+📖 معنی کلمه کلیدی: {keyword} = {keyword_meaning}
 
 💡 نکته آموزشی: در این جمله از ساختار متضاد بین 'simple' و 'complicated' استفاده شده.
 
@@ -17,11 +31,13 @@ def offline_caption(quote, author=""):
 #LifeQuotes #EnglishLearning #زندگی #سادگی #انگیزشی
 """
 
+# ------------------------------
 # کپشن‌ساز ترکیبی آنلاین+آفلاین
+# ------------------------------
 def generate_caption(quote, author=""):
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
-        "Authorization": "Bearer sk-or-openrouter-testing-key",  # کلید تستی
+        "Authorization": "Bearer sk-or-openrouter-testing-key",
         "Content-Type": "application/json"
     }
 
@@ -51,9 +67,18 @@ def generate_caption(quote, author=""):
             raw_content = response.json()["choices"][0]["message"]["content"].strip()
             try:
                 parsed = json.loads(raw_content)
+
+                # ترجمه کامل جمله حتی در حالت آنلاین
+                try:
+                    translated_sentence = GoogleTranslator(source='en', target='fa').translate(quote)
+                except Exception:
+                    translated_sentence = "(ترجمه در دسترس نیست)"
+
                 return f"""{quote} — {author}
 
-📖 معنی کلمه: {parsed['word_meaning']}
+🔹 معنی جمله: {translated_sentence}
+
+📖 معنی کلمه کلیدی: {parsed['word_meaning']}
 
 💡 نکته آموزشی: {parsed['educational_tip']}
 
@@ -61,20 +86,17 @@ def generate_caption(quote, author=""):
 
 {parsed['hashtags']}"""
             except json.JSONDecodeError:
-                # اگر JSON خراب باشه، برگرده به آفلاین
                 return offline_caption(quote, author)
         else:
-            # اگر status_code غیر 200 باشه، فوری بره آفلاین
             return offline_caption(quote, author)
 
     except Exception:
-        # هر نوع خطای اتصال → آفلاین
         return offline_caption(quote, author)
 
 # -----------------------------------
 # رابط کاربری استریم‌لیت
 # -----------------------------------
-st.title("📸 Instagram Bilingual Caption Generator (Always Works)")
+st.title("📸 Instagram Bilingual Caption Generator (Always Works + Full Translation)")
 
 # حالت ۱: ورود دستی
 st.subheader("✏ حالت ۱: ورود مستقیم متن")

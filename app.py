@@ -1,143 +1,161 @@
-import streamlit as st
+requirements = """streamlit==1.49.1
+pandas==2.3.2
+openpyxl==3.1.5
+requests==2.32.2
+deep-translator==1.11.4
+"""
+
+app_py = r'''import streamlit as st
 import pandas as pd
 import requests
-import io
+import os
 import json
 from deep_translator import GoogleTranslator
 
-# ------------------------------
-# کپشنFallback آفلاین با ترجمه کامل
-# ------------------------------
-def offline_caption(quote, author=""):
-    try:
-        translated_sentence = GoogleTranslator(source='en', target='fa').translate(quote)
-    except Exception:
-        translated_sentence = "(ترجمه در دسترس نیست)"
+MEMORY_FILE = "/mnt/data/memory.json"
 
-    # این رو میشه بعداً هوشمند کرد، فعلاً فقط نمونه
-    keyword = "simple"
-    keyword_meaning = "ساده"
+if not os.path.exists(MEMORY_FILE):
+    with open(MEMORY_FILE, "w", encoding="utf-8") as f:
+        json.dump([], f, ensure_ascii=False, indent=2)
 
-    return f"""{quote} — {author}
+st.set_page_config(page_title="Instagram Bilingual Caption Generator (Online Hashtags)", layout="wide")
+st.title("Instagram Bilingual Caption Generator (Online Hashtags)")
 
-🔹 معنی جمله: {translated_sentence}
+st.markdown("این ابزار کپشن‌های دو‌زبانه تولید می‌کند — ترجمه حرفه‌ای، معنی کلیدواژه، نکته آموزشی، CTA و هشتگ‌ها.\nاگر API آنلاین در دسترس نبود، یک fallback آفلاین استفاده می‌شود.")
 
-📖 معنی کلمه کلیدی: {keyword} = {keyword_meaning}
+uploaded_file = st.file_uploader("Upload Excel (optional)", type=["xlsx"])
+text_input = st.text_area("Or paste the English quote here:")
+author = st.text_input("Author / Speaker (optional)")
 
-💡 نکته آموزشی: در این جمله از ساختار متضاد بین 'simple' و 'complicated' استفاده شده.
-
-🤔 به نظر شما چطور میشه زندگی رو ساده‌تر دید؟
-
-#LifeQuotes #EnglishLearning #زندگی #سادگی #انگیزشی
-"""
-
-# ------------------------------
-# کپشن‌ساز ترکیبی آنلاین+آفلاین
-# ------------------------------
-def generate_caption(quote, author=""):
-    url = "https://openrouter.ai/api/v1/chat/completions"
-    headers = {
-        "Authorization": "Bearer sk-or-openrouter-testing-key",
-        "Content-Type": "application/json"
-    }
-
-    prompt = f"""
-    You are an Instagram content creator assistant for a bilingual page that teaches English using inspirational quotes.
-    Analyze this quote: "{quote}" by {author if author else "Unknown"}.
-    Return ONLY a JSON object with these keys:
-    word_meaning: Pick 1 key English word from the quote and give its meaning in Persian.
-    educational_tip: Give a short grammar/vocabulary tip based on the sentence.
-    cta: Create an engaging call-to-action (in Persian or English) to boost user interaction.
-    hashtags: Generate 8-12 relevant hashtags in both English and Persian, separated by spaces.
-    """
-
-    payload = {
-        "model": "openai/gpt-4o-mini",
-        "messages": [
-            {"role": "system", "content": "Respond ONLY with valid JSON and nothing else."},
-            {"role": "user", "content": prompt}
-        ],
-        "temperature": 0.7
-    }
-
-    try:
-        response = requests.post(url, headers=headers, json=payload, timeout=20)
-
-        if response.status_code == 200:
-            raw_content = response.json()["choices"][0]["message"]["content"].strip()
-            try:
-                parsed = json.loads(raw_content)
-
-                # ترجمه کامل جمله حتی در حالت آنلاین
-                try:
-                    translated_sentence = GoogleTranslator(source='en', target='fa').translate(quote)
-                except Exception:
-                    translated_sentence = "(ترجمه در دسترس نیست)"
-
-                return f"""{quote} — {author}
-
-🔹 معنی جمله: {translated_sentence}
-
-📖 معنی کلمه کلیدی: {parsed['word_meaning']}
-
-💡 نکته آموزشی: {parsed['educational_tip']}
-
-{parsed['cta']}
-
-{parsed['hashtags']}"""
-            except json.JSONDecodeError:
-                return offline_caption(quote, author)
-        else:
-            return offline_caption(quote, author)
-
-    except Exception:
-        return offline_caption(quote, author)
-
-# -----------------------------------
-# رابط کاربری استریم‌لیت
-# -----------------------------------
-st.title("📸 Instagram Bilingual Caption Generator (Always Works + Full Translation)")
-
-# حالت ۱: ورود دستی
-st.subheader("✏ حالت ۱: ورود مستقیم متن")
-user_text = st.text_area("یک جمله یا نقل قول انگلیسی وارد کنید:")
-author_name = st.text_input("نام گوینده (اختیاری)")
-
-if st.button("تولید کپشن از متن"):
-    if user_text.strip():
-        st.success("✅ کپشن ساخته شد")
-        st.write(generate_caption(user_text, author_name))
-    else:
-        st.warning("⚠ لطفاً یک جمله وارد کنید.")
-
-st.markdown("---")
-
-# حالت ۲: آپلود Excel
-st.subheader("📂 حالت ۲: آپلود Excel")
-st.info("فایل باید ستونی به نام 'Quote' و در صورت نیاز 'Author' داشته باشد.")
-
-uploaded_file = st.file_uploader("فایل اکسل را آپلود کنید", type=["xlsx"])
+col1, col2 = st.columns(2)
+with col1:
+    use_online = st.checkbox("Use OpenRouter test key for online generation (may be blocked)", value=True)
+with col2:
+    st.write("\n")
 
 if uploaded_file is not None:
-    df = pd.read_excel(uploaded_file)
+    try:
+        df = pd.read_excel(uploaded_file)
+        if 'quote' in df.columns:
+            quotes = df['quote'].astype(str).tolist()
+        else:
+            quotes = df.iloc[:,0].astype(str).tolist()
+    except Exception as e:
+        st.error("Error reading Excel file: " + str(e))
+        quotes = []
+else:
+    quotes = [q for q in [text_input] if q.strip()]
 
-    if "Quote" not in df.columns:
-        st.error("فایل باید ستونی به نام 'Quote' داشته باشد.")
+st.write(f"Quotes to process: {len(quotes)}")
+
+# Utility: memory load/save
+
+def load_memory():
+    try:
+        with open(MEMORY_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, list):
+                return data
+    except Exception:
+        pass
+    return []
+
+
+def save_memory(mem):
+    try:
+        with open(MEMORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(mem, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
+def offline_translation(text: str) -> str:
+    try:
+        return GoogleTranslator(source='en', target='fa').translate(text)
+    except Exception:
+        return "(ترجمه در دسترس نیست)"
+
+
+def fallback_caption(quote: str, author: str):
+    tr = offline_translation(quote)
+    word_meaning = "simple = ساده"  # simple fallback example
+    tip = "در این جمله، contrast بین 'simple' و 'complicated' نشان‌دهنده انتخاب‌های زندگی است."
+    cta = "اگر این جمله را دوست داشتی، کامنت بذار و دوستت رو منشن کن!"
+    hashtags = "#LifeQuotes #EnglishLearning #زندگی #ساده"
+    return {
+        'full_translation': tr,
+        'word_meaning': word_meaning,
+        'educational_tip': tip,
+        'cta': cta,
+        'hashtags': hashtags
+    }
+
+
+def generate_caption(quote: str, author: str = "") -> dict:
+    memory = load_memory()
+    context = "\n".join([f"Example {i+1}: meaning={entry.get('word_meaning','')}; tip={entry.get('educational_tip','')}; hashtags={entry.get('hashtags','')}" for i, entry in enumerate(memory[-5:])])
+
+    prompt = f"""
+You are an expert Instagram content creator and translator.
+Given this quote by {author if author else 'Unknown'}: "{quote}"
+Context examples (for style):\n{context}
+
+Tasks:\n1) Translate the entire quote into natural Persian (do not include the original English sentence in the output).\n2) Choose one key English word and give its Persian meaning.\n3) Provide a short educational tip (grammar/vocab) related to the sentence.\n4) Write an engaging CTA.\n5) Suggest 8-12 hashtags in Persian and English (space-separated).
+
+Return ONLY a valid JSON object with keys: full_translation, word_meaning, educational_tip, cta, hashtags
+"""
+
+    if use_online:
+        try:
+            url = "https://openrouter.ai/api/v1/chat/completions"
+            headers = {"Authorization": "Bearer sk-or-openrouter-testing-key", "Content-Type": "application/json"}
+            payload = {
+                "model": "openai/gpt-4o-mini",
+                "messages": [{"role":"system","content":"Respond only with a valid JSON object, no other text."}, {"role":"user","content":prompt}],
+                "temperature":0.7
+            }
+            resp = requests.post(url, headers=headers, json=payload, timeout=20)
+            if resp.status_code == 200:
+                content = resp.json().get('choices',[{}])[0].get('message',{}).get('content','')
+                try:
+                    data = json.loads(content)
+                    # save to memory
+                    memory.append(data)
+                    memory = memory[-50:]
+                    save_memory(memory)
+                    return data
+                except Exception:
+                    return fallback_caption(quote, author)
+            else:
+                return fallback_caption(quote, author)
+        except Exception:
+            return fallback_caption(quote, author)
     else:
-        captions = [generate_caption(str(row["Quote"]), str(row.get("Author", ""))) for _, row in df.iterrows()]
-        df["Caption"] = captions
+        return fallback_caption(quote, author)
 
-        # ذخیره Excel
-        excel_buffer = io.BytesIO()
-        df.to_excel(excel_buffer, index=False, engine='openpyxl')
-        excel_buffer.seek(0)
 
-        # ذخیره CSV
-        csv_buffer = io.StringIO()
-        df.to_csv(csv_buffer, index=False)
-        csv_buffer.seek(0)
+# Process quotes
+results = []
+for q in quotes:
+    res = generate_caption(q, author)
+    results.append(res)
 
-        st.success("✅ کپشن‌ها ساخته شدند!")
-        st.download_button("⬇ دانلود Excel", data=excel_buffer, file_name="captions.xlsx")
-        st.download_button("⬇ دانلود CSV", data=csv_buffer, file_name="captions.csv")
-        st.dataframe(df[["Quote", "Caption"]])
+# Display
+for i, r in enumerate(results):
+    st.markdown("---")
+    st.markdown(f"### Caption #{i+1}")
+    st.markdown(f"**ترجمه:** {r.get('full_translation','')}")
+    st.markdown(f"**معنی کلیدواژه:** {r.get('word_meaning','')}")
+    st.markdown(f"**نکته آموزشی:** {r.get('educational_tip','')}")
+    st.markdown(f"**CTA:** {r.get('cta','')}")
+    st.markdown(f"**هشتگ‌ها:** {r.get('hashtags','')}")
+
+st.info("حافظه محلی در /mnt/data/memory.json ذخیره می‌شود. برای ریست کردن حافظه، فایل را حذف یا خالی کنید.")
+'''
+
+with open('/mnt/data/requirements.txt','w',encoding='utf-8') as f:
+    f.write(requirements)
+with open('/mnt/data/app.py','w',encoding='utf-8') as f:
+    f.write(app_py)
+
+{"status":"done","files":["/mnt/data/requirements.txt","/mnt/data/app.py"]}

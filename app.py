@@ -4,13 +4,24 @@ import requests
 import io
 import json
 
-# -----------------------------------
-# تابع تولید کپشن کامل هوشمند با Fallback
-# -----------------------------------
+# کپشنFallback آفلاین
+def offline_caption(quote, author=""):
+    return f"""{quote} — {author}
+
+📖 معنی کلمه: simple = ساده
+
+💡 نکته آموزشی: در این جمله از ساختار متضاد بین 'simple' و 'complicated' استفاده شده.
+
+🤔 به نظر شما چطور میشه زندگی رو ساده‌تر دید؟
+
+#LifeQuotes #EnglishLearning #زندگی #سادگی #انگیزشی
+"""
+
+# کپشن‌ساز ترکیبی آنلاین+آفلاین
 def generate_caption(quote, author=""):
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
-        "Authorization": "Bearer sk-or-openrouter-testing-key",  # کلید تستی OpenRouter
+        "Authorization": "Bearer sk-or-openrouter-testing-key",  # کلید تستی
         "Content-Type": "application/json"
     }
 
@@ -27,7 +38,7 @@ def generate_caption(quote, author=""):
     payload = {
         "model": "openai/gpt-4o-mini",
         "messages": [
-            {"role": "system", "content": "Respond ONLY with valid JSON"},
+            {"role": "system", "content": "Respond ONLY with valid JSON and nothing else."},
             {"role": "user", "content": prompt}
         ],
         "temperature": 0.7
@@ -35,24 +46,12 @@ def generate_caption(quote, author=""):
 
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=20)
-        if response.status_code == 200:
-            data = response.json()
-            raw_content = data["choices"][0]["message"]["content"].strip()
 
-            # تلاش برای پارس JSON
+        if response.status_code == 200:
+            raw_content = response.json()["choices"][0]["message"]["content"].strip()
             try:
                 parsed = json.loads(raw_content)
-            except json.JSONDecodeError:
-                # Fallback محتوایی
-                parsed = {
-                    "word_meaning": "simple = ساده",
-                    "educational_tip": "در این جمله از صفت 'simple' برای توصیف زندگی استفاده شده است.",
-                    "cta": "نظر شما چیه؟ آیا زندگی رو ساده می‌بینید؟",
-                    "hashtags": "#LifeQuotes #EnglishLearning #زندگی #سادگی #انگیزشی"
-                }
-
-            # ساخت کپشن
-            return f"""{quote} — {author}
+                return f"""{quote} — {author}
 
 📖 معنی کلمه: {parsed['word_meaning']}
 
@@ -61,27 +60,21 @@ def generate_caption(quote, author=""):
 {parsed['cta']}
 
 {parsed['hashtags']}"""
-
+            except json.JSONDecodeError:
+                # اگر JSON خراب باشه، برگرده به آفلاین
+                return offline_caption(quote, author)
         else:
-            return f"{quote} — {author}\n\n⚠️ خطا در ارتباط با API."
+            # اگر status_code غیر 200 باشه، فوری بره آفلاین
+            return offline_caption(quote, author)
 
     except Exception:
-        # Fallback کلی آفلاین
-        return f"""{quote} — {author}
-
-📖 معنی کلمه: simple = ساده
-
-💡 نکته آموزشی: در این جمله از ساختار متضاد بین 'simple' و 'complicated' استفاده شده.
-
-🤔 به نظر شما چطور میشه زندگی رو ساده‌تر دید؟
-
-#LifeQuotes #EnglishLearning #زندگی #سادگی #انگیزشی
-"""
+        # هر نوع خطای اتصال → آفلاین
+        return offline_caption(quote, author)
 
 # -----------------------------------
 # رابط کاربری استریم‌لیت
 # -----------------------------------
-st.title("📸 Instagram Bilingual Caption Generator (Advanced + Fallback)")
+st.title("📸 Instagram Bilingual Caption Generator (Always Works)")
 
 # حالت ۱: ورود دستی
 st.subheader("✏ حالت ۱: ورود مستقیم متن")
@@ -99,7 +92,7 @@ st.markdown("---")
 
 # حالت ۲: آپلود Excel
 st.subheader("📂 حالت ۲: آپلود Excel")
-st.info("فایل باید ستونی با نام 'Quote' و در صورت نیاز 'Author' داشته باشد.")
+st.info("فایل باید ستونی به نام 'Quote' و در صورت نیاز 'Author' داشته باشد.")
 
 uploaded_file = st.file_uploader("فایل اکسل را آپلود کنید", type=["xlsx"])
 
@@ -109,12 +102,7 @@ if uploaded_file is not None:
     if "Quote" not in df.columns:
         st.error("فایل باید ستونی به نام 'Quote' داشته باشد.")
     else:
-        captions = []
-        for _, row in df.iterrows():
-            quote = str(row["Quote"])
-            author_val = str(row.get("Author", ""))
-            captions.append(generate_caption(quote, author_val))
-
+        captions = [generate_caption(str(row["Quote"]), str(row.get("Author", ""))) for _, row in df.iterrows()]
         df["Caption"] = captions
 
         # ذخیره Excel

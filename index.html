@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تحلیل نقل قول انگلیسی</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🎯 تحلیل نقل قول انگلیسی</h1>
+            <p>نقل قول‌های انگلیسی را تحلیل کرده و برای اینستاگرام آماده کنید</p>
+        </header>
+
+        <div class="input-section">
+            <div class="input-group">
+                <label for="quote">نقل قول انگلیسی:</label>
+                <textarea id="quote" placeholder="نقل قول انگلیسی خود را اینجا بنویسید..."></textarea>
+            </div>
+            
+            <div class="input-group">
+                <label for="apiKey">کلید API OpenAI (اختیاری):</label>
+                <input type="password" id="apiKey" placeholder="sk-...">
+                <small>اگر کلید API ندارید، از نمونه آزمایشی استفاده خواهد شد</small>
+            </div>
+
+            <button id="analyzeBtn" class="analyze-btn">
+                <span class="btn-text">🔍 تحلیل کن</span>
+                <div class="loading hidden">
+                    <div class="spinner"></div>
+                    در حال تحلیل...
+                </div>
+            </button>
+        </div>
+
+        <div id="results" class="results hidden">
+            <div class="result-card">
+                <div class="card-header">
+                    <h3>📚 منبع و سال</h3>
+                    <button class="copy-btn" onclick="copyToClipboard('source')">📋</button>
+                </div>
+                <div id="source" class="card-content"></div>
+            </div>
+
+            <div class="result-card">
+                <div class="card-header">
+                    <h3>ترجمه</h3>
+                    <button class="copy-btn" onclick="copyToClipboard('translation')">📋</button>
+                </div>
+                <div id="translation" class="card-content"></div>
+            </div>
+
+            <div class="result-card">
+                <div class="card-header">
+                    <h3>🎓 نکته آموزشی</h3>
+                    <button class="copy-btn" onclick="copyToClipboard('educational')">📋</button>
+                </div>
+                <div id="educational" class="card-content"></div>
+            </div>
+
+            <div class="result-card">
+                <div class="card-header">
+                    <h3>📱 متن اینستاگرام</h3>
+                    <button class="copy-btn" onclick="copyToClipboard('instagram')">📋</button>
+                </div>
+                <div id="instagram" class="card-content"></div>
+            </div>
+
+            <div class="result-card">
+                <div class="card-header">
+                    <h3>#️⃣ هشتگ‌ها</h3>
+                    <button class="copy-btn" onclick="copyToClipboard('hashtags')">📋</button>
+                </div>
+                <div id="hashtags" class="card-content hashtags-container"></div>
+            </div>
+
+            <div class="result-card final-post">
+                <div class="card-header">
+                    <h3>🎨 پست نهایی</h3>
+                    <button class="copy-btn" onclick="copyToClipboard('finalPost')">📋</button>
+                </div>
+                
+                <div class="template-selector">
+                    <button class="template-btn active" onclick="selectTemplate('elegant')">شیک</button>
+                    <button class="template-btn" onclick="selectTemplate('modern')">مدرن</button>
+                    <button class="template-btn" onclick="selectTemplate('minimal')">مینیمال</button>
+                    <button class="template-btn" onclick="selectTemplate('simple')">ساده</button>
+                </div>
+
+                <div id="finalPost" class="final-post-content"></div>
+            </div>
+        </div>
+
+        <div id="notification" class="notification hidden">
+            <span id="notificationText"></span>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>ساخته شده با ❤️ برای یادگیری بهتر زبان انگلیسی</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
